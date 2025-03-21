@@ -1,2 +1,2 @@
-# hackathon
-summit hackathon project
+# SHS Hackathon
+Converts text into a handwritten PDF
