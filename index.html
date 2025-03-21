@@ -3,109 +3,342 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Text to PDF Generator</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <title>PDF Text Generator</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css" rel="stylesheet">
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f4f9;
-            color: #333;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            flex-direction: column;
+            padding: 20px;
+            background-color: #f8f9fa;
         }
-
         .container {
-            background-color: #fff;
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            max-width: 500px;
-            width: 100%;
-            text-align: center;
+            max-width: 1200px;
         }
-
-        h1 {
-            font-size: 2rem;
-            margin-bottom: 1.5rem;
-            color: #2c3e50;
-        }
-
-        textarea {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #ddd;
+        .editor-container, .chat-container {
+            background-color: white;
             border-radius: 8px;
-            font-size: 1rem;
-            resize: vertical;
-            transition: border-color 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
         }
-
-        textarea:focus {
-            border-color: #3498db;
-            outline: none;
-        }
-
-        button {
-            background-color: #3498db;
-            color: #fff;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            font-size: 1rem;
-            border-radius: 8px;
-            cursor: pointer;
-            margin-top: 1rem;
-            transition: background-color 0.3s ease, transform 0.2s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        button:hover {
-            background-color: #2980b9;
-            transform: translateY(-2px);
-        }
-
-        button i {
-            font-size: 1.2rem;
-        }
-
-        iframe {
-            width: 100%;
+        .CodeMirror {
             height: 400px;
-            border: none;
-            margin-top: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
         }
-
-        .download-btn {
-            margin-top: 10px;
-            display: block;
-            text-decoration: none;
-            color: #fff;
-            background-color: #2ecc71;
-            padding: 10px 15px;
+        .chat-history {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #f9f9f9;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
             border-radius: 8px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        .user-message {
+            background-color: #0d6efd;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+        .ai-message {
+            background-color: #e9ecef;
+            color: #212529;
+        }
+        .message-info {
+            font-size: 0.75rem;
+            color: #6c757d;
+            margin-top: 2px;
+        }
+        .pdf-container {
+            height: 600px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .pdf-embed {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .hidden {
+            display: none;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        .chat-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Text to PDF Generator</h1>
-        <form method="POST">
-            <textarea name="text" rows="10" placeholder="Enter your text here..."></textarea>
-            <button type="submit">
-                <i class="fas fa-file-pdf"></i>
-                Generate PDF
-            </button>
-        </form>
-
-        {% if pdf_url %}
-            <iframe src="{{ pdf_url }}"></iframe>
-            <a class="download-btn" href="{{ pdf_url }}" download>Download PDF</a>
-        {% endif %}
+        <h1 class="text-center mb-4">PDF Text Generator</h1>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="editor-container">
+                    <h3>Text Editor</h3>
+                    <p class="text-muted">Edit your content.txt file here</p>
+                    <textarea id="editor">{{ content }}</textarea>
+                    <div class="d-flex justify-content-between mt-3">
+                        <button id="saveBtn" class="btn btn-primary">Save Content</button>
+                        <button id="generateBtn" class="btn btn-success">Generate PDF</button>
+                    </div>
+                </div>
+                
+                <div class="chat-container">
+                    <h3>Chat with Gemini</h3>
+                    <div class="chat-controls">
+                        <select id="modelSelect" class="form-select">
+                            {% for model in models %}
+                            <option value="{{ model }}">{{ model }}</option>
+                            {% endfor %}
+                        </select>
+                        <button id="clearChatBtn" class="btn btn-outline-danger">Clear Chat</button>
+                    </div>
+                    <div class="chat-history" id="chatHistory">
+                        {% for message in chat_history %}
+                            {% if message.type == 'user' %}
+                                <div class="message user-message">{{ message.content }}</div>
+                            {% else %}
+                                <div class="message ai-message">
+                                    {{ message.content }}
+                                    <div class="message-info">Model: {{ message.model }}</div>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="chatInput" class="form-control" placeholder="Ask Gemini...">
+                        <button id="sendBtn" class="btn btn-primary">Send</button>
+                    </div>
+                    <div class="mt-2">
+                        <button id="insertToEditorBtn" class="btn btn-outline-secondary btn-sm" {% if not chat_history %}disabled{% endif %}>Insert Last Response to Editor</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div id="pdfContainer" class="pdf-container {% if not pdf_exists %}hidden{% endif %}">
+                    <h3>PDF Preview</h3>
+                    <embed id="pdfEmbed" class="pdf-embed" src="/static/content.pdf?t={{ timestamp }}" type="application/pdf">
+                    <div class="d-flex justify-content-center mt-3">
+                        <a id="downloadBtn" href="/download_pdf" class="btn btn-primary" download>Download PDF</a>
+                    </div>
+                </div>
+                
+                <div id="loadingContainer" class="loading hidden">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p>Generating PDF...</p>
+                </div>
+                
+                <div id="initialMessage" class="text-center {% if pdf_exists %}hidden{% endif %}">
+                    <h3>PDF Preview</h3>
+                    <p class="text-muted">Generate a PDF to see the preview here</p>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/markdown/markdown.min.js"></script>
+    
+    <script>
+        // Initialize CodeMirror editor
+        const editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
+            lineNumbers: true,
+            mode: 'text/plain',
+            theme: 'default',
+            lineWrapping: true
+        });
+
+        let lastAiResponse = "";
+        
+        // Check if PDF file exists on load
+        $.ajax({
+            url: '/static/content.pdf',
+            type: 'HEAD',
+            success: function() {
+                $('#initialMessage').addClass('hidden');
+                $('#pdfContainer').removeClass('hidden');
+            },
+            error: function() {
+                $('#initialMessage').removeClass('hidden');
+                $('#pdfContainer').addClass('hidden');
+            }
+        });
+        
+        // Save content
+        $('#saveBtn').click(function() {
+            const content = editor.getValue();
+            
+            $.ajax({
+                url: '/save_content',
+                type: 'POST',
+                data: { content: content },
+                success: function(response) {
+                    alert('Content saved successfully');
+                },
+                error: function(error) {
+                    alert('Error saving content');
+                    console.error(error);
+                }
+            });
+        });
+        
+        // Generate PDF
+        $('#generateBtn').click(function() {
+            const content = editor.getValue();
+            
+            // Show loading
+            $('#initialMessage').addClass('hidden');
+            $('#pdfContainer').addClass('hidden');
+            $('#loadingContainer').removeClass('hidden');
+            
+            $.ajax({
+                url: '/generate_pdf',
+                type: 'POST',
+                data: { content: content },
+                success: function(response) {
+                    // Hide loading, show PDF
+                    $('#loadingContainer').addClass('hidden');
+                    $('#pdfContainer').removeClass('hidden');
+                    
+                    // Update PDF embed with cache-busting parameter
+                    const timestamp = new Date().getTime();
+                    $('#pdfEmbed').attr('src', response.pdf_url + '?t=' + timestamp);
+                },
+                error: function(error) {
+                    $('#loadingContainer').addClass('hidden');
+                    $('#initialMessage').removeClass('hidden');
+                    alert('Error generating PDF');
+                    console.error(error);
+                }
+            });
+        });
+        
+        // Chat with Gemini
+        $('#sendBtn').click(function() {
+            const message = $('#chatInput').val().trim();
+            if (!message) return;
+            
+            const selectedModel = $('#modelSelect').val();
+            
+            // Add user message to chat
+            $('#chatHistory').append(`<div class="message user-message">${message}</div>`);
+            $('#chatInput').val('');
+            
+            // Auto-scroll chat history
+            scrollChatToBottom();
+            
+            // Send request to Gemini
+            $.ajax({
+                url: '/chat',
+                type: 'POST',
+                data: { 
+                    message: message,
+                    model: selectedModel
+                },
+                success: function(response) {
+                    if (response.status === 'success') {
+                        // Add AI response to chat with model info
+                        $('#chatHistory').append(`
+                            <div class="message ai-message">
+                                ${response.response}
+                                <div class="message-info">Model: ${selectedModel}</div>
+                            </div>
+                        `);
+                        
+                        // Store last response for insertion
+                        lastAiResponse = response.response;
+                        $('#insertToEditorBtn').prop('disabled', false);
+                        
+                        // Auto-scroll chat history
+                        scrollChatToBottom();
+                    } else {
+                        alert('Error: ' + response.message);
+                    }
+                },
+                error: function(error) {
+                    alert('Error communicating with server');
+                    console.error(error);
+                }
+            });
+        });
+        
+        // Clear chat history
+        $('#clearChatBtn').click(function() {
+            if (confirm('Are you sure you want to clear the chat history? This cannot be undone.')) {
+                $.ajax({
+                    url: '/clear_chat',
+                    type: 'POST',
+                    success: function(response) {
+                        $('#chatHistory').empty();
+                        $('#insertToEditorBtn').prop('disabled', true);
+                        lastAiResponse = "";
+                    },
+                    error: function(error) {
+                        alert('Error clearing chat history');
+                        console.error(error);
+                    }
+                });
+            }
+        });
+        
+        // Handle Enter key in chat input
+        $('#chatInput').keypress(function(e) {
+            if (e.which === 13) {
+                $('#sendBtn').click();
+                return false;
+            }
+        });
+        
+        // Insert AI response to editor
+        $('#insertToEditorBtn').click(function() {
+            if (lastAiResponse) {
+                const currentContent = editor.getValue();
+                const cursorPos = editor.getCursor();
+                
+                // Insert at cursor position
+                editor.replaceRange(lastAiResponse, cursorPos);
+            }
+        });
+        
+        // Function to scroll chat history to bottom
+        function scrollChatToBottom() {
+            const chatHistory = document.getElementById('chatHistory');
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+        
+        // Initialize: scroll chat to bottom on page load
+        $(document).ready(function() {
+            scrollChatToBottom();
+            
+            // Get last AI response for insert button
+            const aiMessages = $('.ai-message');
+            if (aiMessages.length > 0) {
+                lastAiResponse = $(aiMessages[aiMessages.length - 1]).text().trim();
+                $('#insertToEditorBtn').prop('disabled', false);
+            }
+        });
+    </script>
 </body>
 </html>
