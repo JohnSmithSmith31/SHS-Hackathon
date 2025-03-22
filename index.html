@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text to Handwriting Generator</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        /* Dark Mode Toggle Styles */
+        body.dark-mode {
+            background-color: #343a40;
+            color: #f8f9fa;
+        }
+        body.dark-mode .editor-container,
+        body.dark-mode .chat-container,
+        body.dark-mode .pdf-container,
+        body.dark-mode .constants-container {
+            background-color: #495057;
+            color: #f8f9fa;
+            border-color: #6c757d;
+            box-shadow: 0 4px 12px rgba(248, 249, 250, 0.1);
+        }
+        body.dark-mode .editor-container h3,
+        body.dark-mode .chat-container h3,
+        body.dark-mode .pdf-container h3,
+        body.dark-mode .constants-container h3 {
+            color: #f8f9fa;
+        }
+        body.dark-mode .text-muted {
+            color: #adb5bd !important;
+        }
+        body.dark-mode .CodeMirror {
+            background-color: #495057;
+            border-color: #6c757d;
+            color: #f8f9fa;
+        }
+        body.dark-mode .CodeMirror-linenumber {
+            color: #adb5bd;
+        }
+        body.dark-mode .chat-history {
+            background-color: #6c757d;
+            border-color: #6c757d;
+            color: #f8f9fa;
+        }
+        body.dark-mode .ai-message {
+            background-color: #e9ecef; /* Keep light for AI messages */
+            color: #212529;        /* Keep dark text for AI messages */
+        }
+        body.dark-mode .user-message {
+            background-color: #007bff; /* Keep primary color for user messages */
+        }
+        body.dark-mode .message-info {
+            color: #ced4da;
+        }
+        body.dark-mode .form-control,
+        body.dark-mode .form-select {
+            background-color: #6c757d;
+            color: #f8f9fa;
+            border-color: #6c757d;
+        }
+        body.dark-mode .form-control:focus,
+        body.dark-mode .form-select:focus {
+            background-color: #495057;
+            color: #f8f9fa;
+            border-color: #007bff;
+            box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.25);
+        }
+        body.dark-mode .constants-container .form-label {
+            color: #f8f9fa;
+        }
+        body.dark-mode .constant-value {
+            color: #00e0ff; /* Highlight color in dark mode */
+        }
+
+
+        /* Rest of the CSS (mostly unchanged, just ensuring dark mode compatibility) */
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Nicer font */
+        }
+        .container {
+            max-width: 1200px;
+        }
+        .editor-container, .chat-container, .pdf-container, .constants-container {
+            background-color: white;
+            border-radius: 10px; /* Rounded corners */
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); /* Stronger shadow */
+            padding: 25px; /* Increased padding */
+            margin-bottom: 25px; /* Increased margin */
+            border: 1px solid #e0e0e0; /* Light border */
+        }
+        .editor-container h3, .chat-container h3, .pdf-container h3, .constants-container h3 {
+            color: #343a40; /* Darker heading color */
+            margin-bottom: 20px;
+            display: flex; /* Align icon and text */
+            align-items: center;
+            gap: 10px;
+        }
+        .editor-container h3 i, .chat-container h3 i, .pdf-container h3 i, .constants-container h3 i {
+            font-size: 1.5em; /* Icon size */
+            color: #007bff; /* Primary icon color */
+        }
+        .CodeMirror {
+            height: 400px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .chat-history {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f9f9f9;
+        }
+        .message {
+            margin-bottom: 12px;
+            padding: 10px 15px;
+            border-radius: 10px;
+            max-width: 80%;
+            word-wrap: break-word;
+            animation: fadeIn 0.5s ease-out; /* Fade-in animation */
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .user-message {
+            background-color: #0d6efd;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+        .ai-message {
+            background-color: #e9ecef;
+            color: #212529;
+        }
+        .message-info {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-top: 3px;
+        }
+        .pdf-container {
+            height: 600px;
+        }
+        .pdf-embed {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 5px;
+        }
+        .hidden {
+            display: none;
+        }
+        .loading {
+            text-align: center;
+            padding: 30px;
+        }
+        .loading .spinner-border {
+            width: 2.5rem; /* Larger spinner */
+            height: 2.5rem;
+        }
+        .chat-controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .btn-primary, .btn-success, .btn-danger, .btn-outline-secondary {
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15); /* Button shadow */
+            transition: transform 0.1s ease-in-out; /* Button animation */
+        }
+        .btn-primary:hover, .btn-success:hover, .btn-danger:hover, .btn-outline-secondary:hover {
+            transform: scale(1.03);
+        }
+        .constants-container .form-label {
+            font-weight: 500;
+            color: #495057;
+        }
+        .constants-container .form-range, .constants-container .form-control {
+            margin-bottom: 15px;
+        }
+        .constant-value {
+            display: inline-block;
+            margin-left: 10px;
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="mb-0"><i class="bi bi-pencil-square me-2"></i> Text to Handwriting Generator</h1>
+            <button id="darkModeToggle" class="btn btn-outline-secondary"><i class="bi bi-moon-fill"></i> Dark Mode</button>
+        </div>
+
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="editor-container">
+                    <h3><i class="bi bi-journal-text"></i> Text Editor</h3>
+                    <p class="text-muted">Edit your content.txt file here</p>
+                    <textarea id="editor">{{ content }}</textarea>
+                    <div class="d-flex justify-content-between mt-3">
+                        <button id="saveBtn" class="btn btn-primary"><i class="bi bi-save me-1"></i> Save Content</button>
+                        <button id="generatePdfBtn" class="btn btn-success"><i class="bi bi-file-earmark-pdf me-1"></i> Generate PDF</button>
+                    </div>
+                </div>
+
+                <div class="chat-container">
+                    <h3><i class="bi bi-chat-dots"></i> Chat with Gemini</h3>
+                    <div class="chat-controls">
+                        <select id="modelSelect" class="form-select">
+                            {% for model in models %}
+                            <option value="{{ model }}">{{ model }}</option>
+                            {% endfor %}
+                        </select>
+                        <button id="clearChatBtn" class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i> Clear Chat</button>
+                    </div>
+                    <div class="chat-history" id="chatHistory">
+                        {% for message in chat_history %}
+                            {% if message.type == 'user' %}
+                                <div class="message user-message">{{ message.content }}</div>
+                            {% else %}
+                                <div class="message ai-message">
+                                    {{ message.content }}
+                                    <div class="message-info">Model: {{ message.model }}</div>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="chatInput" class="form-control" placeholder="Ask Gemini...">
+                        <button id="sendBtn" class="btn btn-primary"><i class="bi bi-send"></i> Send</button>
+                    </div>
+                    <!-- Insert to editor button removed -->
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="constants-container">
+                    <h3><i class="bi bi-sliders"></i> Adjust Constants</h3>
+                    <button id="resetConstantsBtn" class="btn btn-outline-secondary btn-sm mb-3"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset Constants</button>
+                    <div class="row row-cols-md-2 row-cols-1">
+                        <div class="col">
+                            <div class="mb-3">
+                                <label for="PAGE_WIDTH_CM" class="form-label">Page Width (cm): <span id="PAGE_WIDTH_CM_value" class="constant-value"></span></label>
+                                <input type="range" class="form-range" id="PAGE_WIDTH_CM" min="10" max="30" step="0.1" value="{{ constants.PAGE_WIDTH_CM }}">
+                            </div>
+                            <div class="mb-3">
+                                <label for="PAGE_HEIGHT_CM" class="form-label">Page Height (cm): <span id="PAGE_HEIGHT_CM_value" class="constant-value"></span></label>
+                                <input type="range" class="form-range" id="PAGE_HEIGHT_CM" min="20" max="40" step="0.1" value="{{ constants.PAGE_HEIGHT_CM }}">
+                            </div>
+                            <div class="mb-3">
+                                <label for="LEFT_MARGIN_CM" class="form-label">Left Margin (cm): <span id="LEFT_MARGIN_CM_value" class="constant-value"></span></label>
+                                <input type="range" class="form-range" id="LEFT_MARGIN_CM" min="0" max="5" step="0.1" value="{{ constants.LEFT_MARGIN_CM }}">
+                            </div>
+                            <div class="mb-3">
+                                <label for="RIGHT_MARGIN_CM" class="form-label">Right Margin (cm): <span id="RIGHT_MARGIN_CM_value" class="constant-value"></span></label>
+                                <input type="range" class="form-range" id="RIGHT_MARGIN_CM" min="0" max="5" step="0.1" value="{{ constants.RIGHT_MARGIN_CM }}">
+                            </div>
+                            <div class="mb-3">
+                                <label for="TOP_MARGIN_CM" class="form-label">Top Margin (cm): <span id="TOP_MARGIN_CM_value" class="constant-value"></span></label>
+                                <input type="range" class="form-range" id="TOP_MARGIN_CM" min="0" max="8" step="0.1" value="{{ constants.TOP_MARGIN_CM }}">
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="mb-3">
+                                <label for="LINE_HEIGHT_CM" class="form-label">Line Height (cm): <span id="LINE_HEIGHT_CM_value" class="constant-value"></span></label>
+                                <input type="range" class="form-range" id="LINE_HEIGHT_CM" min="0.5" max="2" step="0.05" value="{{ constants.LINE_HEIGHT_CM }}">
+                            </div>
+                            <div class="mb-3">
+                                <label for="MAX_LINES_PER_PAGE" class="form-label">Max Lines per Page: <span id="MAX_LINES_PER_PAGE_value" class="constant-value"></span></label>
+                                <input type="range" class="form-range" id="MAX_LINES_PER_PAGE" min="10" max="50" step="1" value="{{ constants.MAX_LINES_PER_PAGE }}">
+                            </div>
+                            <div class="mb-3">
+                                <label for="FONT_SIZE" class="form-label">Font Size: <span id="FONT_SIZE_value" class="constant-value"></span></label>
+                                <input type="range" class="form-range" id="FONT_SIZE" min="10" max="40" step="1" value="{{ constants.FONT_SIZE }}">
+                            </div>
+                            <div class="mb-3">
+                                <label for="LETTER_SPACING_FACTOR" class="form-label">Letter Spacing: <span id="LETTER_SPACING_FACTOR_value" class="constant-value"></span></label>
+                                <input type="range" class="form-range" id="LETTER_SPACING_FACTOR" min="0.5" max="1.5" step="0.05" value="{{ constants.LETTER_SPACING_FACTOR }}">
+                            </div>
+                             <div class="mb-3">
+                                <label for="TAB_WIDTH" class="form-label">Tab Width (spaces): <span id="TAB_WIDTH_value" class="constant-value"></span></label>
+                                <input type="range" class="form-range" id="TAB_WIDTH" min="2" max="8" step="1" value="{{ constants.TAB_WIDTH }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="pdfContainer" class="pdf-container {% if not pdf_exists %}hidden{% endif %}">
+                    <h3><i class="bi bi-file-earmark-pdf"></i> PDF Preview</h3>
+                    <embed id="pdfEmbed" class="pdf-embed" src="/static/content.pdf?t={{ timestamp }}" type="application/pdf">
+                    <div class="d-flex justify-content-center mt-3 gap-2">
+                        <a id="downloadPdfBtn" href="/download_pdf" class="btn btn-primary" download><i class="bi bi-download me-1"></i> Download PDF</a>
+                    </div>
+                </div>
+
+                <div id="loadingContainer" class="loading hidden">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p>Generating document...</p>
+                </div>
+
+                <div id="initialMessage" class="text-center {% if pdf_exists %}hidden{% endif %}">
+                    <h3><i class="bi bi-file-earmark-pdf"></i> PDF Preview</h3>
+                    <p class="text-muted">Generate a PDF to see the preview here</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/markdown/markdown.min.js"></script>
+
+    <script>
+        // Initialize CodeMirror editor
+        const editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
+            lineNumbers: true,
+            mode: 'text/plain',
+            theme: 'default',
+            lineWrapping: true
+        });
+
+
+        // Function to update constant value display
+        function updateConstantValue(inputId) {
+            const slider = document.getElementById(inputId);
+            const valueSpan = document.getElementById(inputId + '_value');
+            valueSpan.textContent = slider.value;
+        }
+
+        // Initialize constant value displays and add input event listeners
+        document.querySelectorAll('.form-range').forEach(slider => {
+            updateConstantValue(slider.id);
+            slider.addEventListener('input', () => updateConstantValue(slider.id));
+        });
+
+
+        // Check if PDF file exists on load - adapted to handle only PDF
+        function checkDocumentExists() {
+            $.ajax({
+                url: '/static/content.pdf', // Check for PDF
+                type: 'HEAD',
+                success: function() {
+                    $('#initialMessage').addClass('hidden');
+                    $('#pdfContainer').removeClass('hidden');
+                    $('#pdfEmbed').removeClass('hidden'); // Ensure PDF embed is shown if PDF exists
+                    $('#downloadPdfBtn').removeClass('hidden');
+                    $('#pdfEmbed').attr('src', '/static/content.pdf?t=' + new Date().getTime()); // Refresh PDF
+                },
+                error: function() {
+                    $('#initialMessage').removeClass('hidden');
+                    $('#pdfContainer').addClass('hidden');
+                }
+            });
+        }
+
+        checkDocumentExists(); // Call on page load
+
+
+        // Save content
+        $('#saveBtn').click(function() {
+            const content = editor.getValue();
+
+            $.ajax({
+                url: '/save_content',
+                type: 'POST',
+                data: { content: content },
+                success: function(response) {
+                    alert('Content saved successfully');
+                },
+                error: function(error) {
+                    alert('Error saving content');
+                    console.error(error);
+                }
+            });
+        });
+
+        // Generate PDF
+        $('#generatePdfBtn').click(function() {
+            const content = editor.getValue();
+            const constants = {};
+            document.querySelectorAll('.form-range').forEach(slider => {
+                constants[slider.id] = slider.value;
+            });
+
+            // Show loading
+            $('#initialMessage').addClass('hidden');
+            $('#pdfContainer').addClass('hidden');
+            $('#loadingContainer').removeClass('hidden');
+            $('#downloadPdfBtn').addClass('hidden'); // Hide download buttons during loading
+
+
+            $.ajax({
+                url: '/generate_pdf',
+                type: 'POST',
+                data: { content: content, ...constants }, // Send content and all constants
+                success: function(response) {
+                    // Hide loading, show document container
+                    $('#loadingContainer').addClass('hidden');
+                    $('#pdfContainer').removeClass('hidden');
+                    $('#pdfEmbed').removeClass('hidden'); // Show PDF embed
+                    $('#downloadPdfBtn').removeClass('hidden'); // Show PDF download button
+                    // Update PDF embed with cache-busting parameter
+                    const timestamp = new Date().getTime();
+                    $('#pdfEmbed').attr('src', response.pdf_url + '?t=' + timestamp);
+
+                },
+                error: function(error) {
+                    $('#loadingContainer').addClass('hidden');
+                    $('#initialMessage').removeClass('hidden');
+                    alert('Error generating document');
+                    console.error(error);
+                }
+            });
+        });
+
+
+        // Chat with Gemini - same as before... (stateless now)
+        $('#sendBtn').click(function() {
+            const message = $('#chatInput').val().trim();
+            if (!message) return;
+
+            const selectedModel = $('#modelSelect').val();
+
+            // Add user message to chat
+            $('#chatHistory').append(`<div class="message user-message">${message}</div>`);
+            $('#chatInput').val('');
+
+            // Auto-scroll chat history
+            scrollChatToBottom();
+
+            // Send request to Gemini
+            $.ajax({
+                url: '/chat',
+                type: 'POST',
+                data: {
+                    message: message,
+                    model: selectedModel
+                },
+                success: function(response) {
+                    if (response.status === 'success') {
+                        // Add AI response to chat with model info
+                        $('#chatHistory').append(`
+                            <div class="message ai-message">
+                                ${response.response}
+                                <div class="message-info">Model: ${selectedModel}</div>
+                            </div>
+                        `);
+
+                        // Auto-scroll chat history
+                        scrollChatToBottom();
+                    } else {
+                        alert('Error: ' + response.message);
+                    }
+                },
+                error: function(error) {
+                    alert('Error communicating with server');
+                    console.error(error);
+                }
+            });
+        });
+
+        // Clear chat history - still exists for button click, but stateless now
+        $('#clearChatBtn').click(function() {
+            if (confirm('Are you sure you want to clear the chat history? This cannot be undone.')) {
+                $('#chatHistory').empty(); // Just clear frontend display
+            }
+        });
+
+        // Handle Enter key in chat input - same as before...
+        $('#chatInput').keypress(function(e) {
+            if (e.which === 13) {
+                $('#sendBtn').click();
+                return false;
+            }
+        });
+
+
+        // Function to scroll chat history to bottom - same as before...
+        function scrollChatToBottom() {
+            const chatHistory = document.getElementById('chatHistory');
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        // Reset Constants Button Functionality
+        $('#resetConstantsBtn').click(function() {
+            $.ajax({
+                url: '/reset_constants',
+                type: 'POST',
+                dataType: 'json',
+                success: function(data) {
+                    for (const key in data) {
+                        if (data.hasOwnProperty(key)) {
+                            const slider = document.getElementById(key);
+                            if (slider) {
+                                slider.value = data[key];
+                                updateConstantValue(key); // Update displayed value
+                            }
+                        }
+                    }
+                    alert('Constants reset to default values.');
+                },
+                error: function(error) {
+                    alert('Error resetting constants.');
+                    console.error('Error:', error);
+                }
+            });
+        });
+
+
+        // Dark Mode Toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const body = document.body;
+        let darkMode = localStorage.getItem('darkMode') === 'enabled'; // Check local storage
+
+        // Set initial dark mode state
+        if (darkMode) {
+            body.classList.add('dark-mode');
+            darkModeToggle.innerHTML = '<i class="bi bi-sun-fill"></i> Light Mode';
+        }
+
+        darkModeToggle.addEventListener('click', () => {
+            darkMode = !darkMode;
+            body.classList.toggle('dark-mode');
+            localStorage.setItem('darkMode', darkMode ? 'enabled' : 'disabled'); // Store preference
+            darkModeToggle.innerHTML = darkMode ? '<i class="bi bi-sun-fill"></i> Light Mode' : '<i class="bi bi-moon-fill"></i> Dark Mode';
+        });
+
+
+        // Initialize: scroll chat to bottom on page load and get initial constants
+        $(document).ready(function() {
+            scrollChatToBottom();
+
+
+            // Fetch default constants and set slider values
+            $.getJSON('/get_constants', function(data) {
+                for (const key in data) {
+                    if (data.hasOwnProperty(key)) {
+                        const slider = document.getElementById(key);
+                        if (slider) {
+                            slider.value = data[key];
+                            updateConstantValue(key); // Update displayed value
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
